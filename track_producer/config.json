@@ -1,0 +1,8 @@
+{
+    "redirect_uri": "http://localhost:8080/callback",
+    "playlists": {
+        "Global Top 50": "37i9dQZEVXbMDoHDwVN2tF",
+        "Chill Hits": "37i9dQZF1DX4WYpdgoIcn6",
+        "Hip Hop Central": "37i9dQZF1DWY6tYEFs22tT"
+    }
+}

@@ -5,16 +5,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/Shopify/sarama"
 	"github.com/zmb3/spotify"
 )
 
 type App struct {
-	client         *spotify.Client
-	shutdownSignal chan string
-	server         *http.Server
-	code           string
+	client *spotify.Client
 }
 
 const redirectURI = "http://localhost:8080/callback"
@@ -28,44 +26,49 @@ var (
 )
 
 func main() {
-	Authenticate()
-	producer, err := KafkaProducerSetup()
-
+	// load config containing playlist IDs
+	config, err := loadConfig()
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatal(err)
 	}
 
-	playlists := map[string]string{
-		"Global Top 50":   "37i9dQZEVXbMDoHDwVN2tF",
-		"Chill Hits":      "37i9dQZF1DX4WYpdgoIcn6",
-		"Hip Hop Central": "37i9dQZF1DWY6tYEFs22tT",
+	// authenticates user and stores tokens
+	err = Authenticate()
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	producer, err := KafkaProducerSetup()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// get playlist tracks and produce to kafka
+	playlists := config["playlists"].(map[string]interface{})
 	for playlistName, playlistID := range playlists {
-		go app.GetPlaylistTracks(playlistName, playlistID, tracks)
+		go app.GetPlaylistTracks(playlistName, playlistID.(string), tracks)
 	}
 
-	for trackList := range tracks {
-		parsedTrackList, err := json.Marshal(trackList)
-		fmt.Println(string(parsedTrackList))
-
+	for _, playlistID := range playlists {
+		trackList, err := json.Marshal(<-tracks)
 		if err != nil {
-			fmt.Println(err.Error())
-			return
+			log.Fatalf("Error marshalling track list: %s", err.Error())
 		}
 
 		_, _, err = producer.SendMessage(&sarama.ProducerMessage{
 			Topic: "playlist-tracks",
-			Value: sarama.StringEncoder(string(parsedTrackList)),
+			Key:   sarama.StringEncoder(playlistID.(string)),
+			Value: sarama.StringEncoder(string(trackList)),
 		})
 
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Fatalf("Error producing to kafka: %s", err.Error())
 		}
 	}
+
 }
 
-func Authenticate() {
+func Authenticate() error {
 	http.HandleFunc("/callback", completeAuth)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Println("Got request for:", r.URL.String())
@@ -82,10 +85,12 @@ func Authenticate() {
 	// use the client to make calls that require authorization
 	user, err := client.CurrentUser()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	fmt.Println("You are logged in as:", user.ID)
+
+	return nil
 }
 
 // GetPlaylistTracks gets tracks belonging to a playlist
@@ -126,16 +131,39 @@ func KafkaProducerSetup() (sarama.SyncProducer, error) {
 	return producer, nil
 }
 
+func loadConfig() (map[string]interface{}, error) {
+	var config map[string]interface{}
+	file, err := os.Open("track_producer/config.json")
+
+	if err != nil {
+		return nil, fmt.Errorf("Error opening config file: %s", err.Error())
+	}
+
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(&config)
+
+	if err != nil {
+		return nil, fmt.Errorf("Error decoding config file: %s", err.Error())
+	}
+
+	return config, nil
+}
+
 func completeAuth(w http.ResponseWriter, r *http.Request) {
 	tok, err := auth.Token(state, r)
+
 	if err != nil {
 		http.Error(w, "Couldn't get token", http.StatusForbidden)
 		log.Fatal(err)
 	}
+
 	if st := r.FormValue("state"); st != state {
 		http.NotFound(w, r)
 		log.Fatalf("State mismatch: %s != %s\n", st, state)
 	}
+
 	// use the token to get an authenticated client
 	client := auth.NewClient(tok)
 	fmt.Fprintf(w, "Login Completed!")
