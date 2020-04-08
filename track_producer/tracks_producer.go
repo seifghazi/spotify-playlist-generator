@@ -29,7 +29,6 @@ var (
 
 func main() {
 	Authenticate()
-
 	producer, err := KafkaProducerSetup()
 
 	if err != nil {
