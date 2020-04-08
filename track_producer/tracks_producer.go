@@ -30,45 +30,6 @@ var (
 func main() {
 	Authenticate()
 
-	// // first start an HTTP server
-	// http.HandleFunc("/callback", completeAuth)
-	// http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-	// 	log.Println("Got request for:", r.URL.String())
-	// })
-	// go http.ListenAndServe(":8080", nil)
-
-	// url := auth.AuthURL(state)
-	// fmt.Println("Please log in to Spotify by visiting the following page in your browser:", url)
-
-	// // wait for auth to complete
-	// client := <-ch
-
-	// app := App{
-	// 	client: client,
-	// }
-	// // use the client to make calls that require authorization
-	// user, err := client.CurrentUser()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// fmt.Println("You are logged in as:", user.ID)
-	playlists := map[string]string{
-		"Global Top 50":   "37i9dQZEVXbMDoHDwVN2tF",
-		"Chill Hits":      "37i9dQZF1DX4WYpdgoIcn6",
-		"Hip Hop Central": "37i9dQZF1DWY6tYEFs22tT",
-	}
-
-	// bootstrapServers := []string{"localhost:9092"}
-	// //setup relevant config info
-	// config := sarama.NewConfig()
-	// config.Producer.Partitioner = sarama.NewRandomPartitioner
-	// config.Producer.RequiredAcks = sarama.WaitForAll
-	// config.Producer.Return.Successes = true
-	// config.Version = sarama.MaxVersion
-	// config.Net.MaxOpenRequests = 1
-	// config.Producer.Idempotent = true
-	// producer, _ := sarama.NewSyncProducer(bootstrapServers, config)
-
 	producer, err := KafkaProducerSetup()
 
 	if err != nil {
@@ -76,6 +37,11 @@ func main() {
 		return
 	}
 
+	playlists := map[string]string{
+		"Global Top 50":   "37i9dQZEVXbMDoHDwVN2tF",
+		"Chill Hits":      "37i9dQZF1DX4WYpdgoIcn6",
+		"Hip Hop Central": "37i9dQZF1DWY6tYEFs22tT",
+	}
 	for playlistName, playlistID := range playlists {
 		go app.GetPlaylistTracks(playlistName, playlistID, tracks)
 	}
