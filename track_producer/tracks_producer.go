@@ -22,7 +22,7 @@ var (
 	auth   = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate)
 	ch     = make(chan *spotify.Client)
 	state  = "abc123"
-	tracks = make(chan *spotify.PlaylistTrackPage)
+	tracks = make(chan spotify.FullTrack)
 )
 
 func main() {
@@ -49,16 +49,16 @@ func main() {
 		go app.GetPlaylistTracks(playlistName, playlistID.(string), tracks)
 	}
 
-	for _, playlistID := range playlists {
-		trackList, err := json.Marshal(<-tracks)
+	for track := range tracks {
+		encodedTrack, err := json.Marshal(track)
 		if err != nil {
-			log.Fatalf("Error marshalling track list: %s", err.Error())
+			log.Fatalf("Error marshalling track: %s", err.Error())
 		}
 
 		_, _, err = producer.SendMessage(&sarama.ProducerMessage{
-			Topic: "playlist-tracks",
-			Key:   sarama.StringEncoder(playlistID.(string)),
-			Value: sarama.StringEncoder(string(trackList)),
+			Topic: "playlist-tracklist",
+			Key:   sarama.StringEncoder(track.SimpleTrack.ID),
+			Value: sarama.StringEncoder(string(encodedTrack)),
 		})
 
 		if err != nil {
@@ -94,7 +94,7 @@ func Authenticate() error {
 }
 
 // GetPlaylistTracks gets tracks belonging to a playlist
-func (a *App) GetPlaylistTracks(playlistName, playlistID string, tracks chan *spotify.PlaylistTrackPage) {
+func (a *App) GetPlaylistTracks(playlistName, playlistID string, tracks chan spotify.FullTrack) {
 	fmt.Println("Fetching tracks for playlist: " + playlistName)
 	// send request
 	limit := 10
@@ -108,7 +108,10 @@ func (a *App) GetPlaylistTracks(playlistName, playlistID string, tracks chan *sp
 		return
 	}
 
-	tracks <- playlistTracks
+	trackList := playlistTracks.Tracks
+	for _, track := range trackList {
+		tracks <- track.Track
+	}
 }
 
 func KafkaProducerSetup() (sarama.SyncProducer, error) {
