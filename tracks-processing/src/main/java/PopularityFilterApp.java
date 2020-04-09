@@ -11,9 +11,13 @@ import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Properties;
 
 public class PopularityFilterApp {
+    private Logger log = LoggerFactory.getLogger(PopularityFilterApp.class.getName());
 
     public static void main(String[] args) {
         Properties config = new Properties();
@@ -33,8 +37,8 @@ public class PopularityFilterApp {
                 Consumed.with(Serdes.String(), jsonSerde));
 
         KStream<String, JsonNode>[] branches = playlistTracks.branch(
-                (k, track) -> isPopular(track),
-                (k, track) -> true
+                (trackID, trackData) -> isPopular(trackData),
+                (trackID, trackData) -> true
         );
 
 //        bankBalance.toStream().to("bank-balance-exactly-once", Produced.with(Serdes.String(), jsonSerde));
@@ -51,16 +55,7 @@ public class PopularityFilterApp {
     }
 
     private static boolean isPopular(JsonNode playlistTracks) {
-        try {
-            System.out.println(playlistTracks);
-            JsonNode tracks = new ObjectMapper().readTree(playlistTracks.toString()).get("items");
-            System.out.println(tracks);
-            for (JsonNode track: tracks) {
-                int popularity = track.get("track").get("popularity").asInt();
-                System.out.println("POPULARITY: " + popularity);
-            }
-        } catch (Exception e) {
-        }
-        return false;
+        int popularity = playlistTracks.get("popularity").asInt();
+        return popularity > 80;
     }
 }
