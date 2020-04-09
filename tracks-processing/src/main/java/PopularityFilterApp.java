@@ -1,5 +1,5 @@
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.typesafe.config.ConfigFactory;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
@@ -17,41 +17,62 @@ import org.slf4j.LoggerFactory;
 import java.util.Properties;
 
 public class PopularityFilterApp {
-    private Logger log = LoggerFactory.getLogger(PopularityFilterApp.class.getName());
+    private static Logger log = LoggerFactory.getLogger(PopularityFilterApp.class.getName());
+    private AppConfig appConfig;
 
     public static void main(String[] args) {
+        PopularityFilterApp popularFilterApp = new PopularityFilterApp();
+        popularFilterApp.start();
+    }
+
+    private PopularityFilterApp() {
+        appConfig = new AppConfig(ConfigFactory.load());
+    }
+
+    private void start() {
+        Properties config = getKafkaStreamsConfig();
+        KafkaStreams streams = createTopology(config);
+        streams.cleanUp();
+        streams.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
+    }
+
+    private Properties getKafkaStreamsConfig() {
         Properties config = new Properties();
-        config.put(StreamsConfig.APPLICATION_ID_CONFIG, "spotify-playlist-gen-app");
-        config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "127.0.0.1:9092");
+        config.put(StreamsConfig.APPLICATION_ID_CONFIG, appConfig.getApplicationId());
+        config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, appConfig.getBootstrapServers());
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        config.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, "0");
         config.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, StreamsConfig.EXACTLY_ONCE);
 
-        // json Serde
+        return config;
+    }
+
+    private KafkaStreams createTopology(Properties config) {
+        StreamsBuilder builder = new StreamsBuilder();
+
+        // JSON Serde
         final Serializer<JsonNode> jsonSerializer = new JsonSerializer();
         final Deserializer<JsonNode> jsonDeserializer = new JsonDeserializer();
         final Serde<JsonNode> jsonSerde = Serdes.serdeFrom(jsonSerializer, jsonDeserializer);
-
-        StreamsBuilder builder = new StreamsBuilder();
-
-        KStream<String, JsonNode> playlistTracks = builder.stream("playlist-tracklist",
+        KStream<String, JsonNode> playlistTracks = builder.stream(appConfig.getSourceTopicName(),
                 Consumed.with(Serdes.String(), jsonSerde));
+
 
         KStream<String, JsonNode>[] branches = playlistTracks.branch(
                 (trackID, trackData) -> isPopular(trackData),
                 (trackID, trackData) -> true
         );
 
-//        bankBalance.toStream().to("bank-balance-exactly-once", Produced.with(Serdes.String(), jsonSerde));
+        KStream<String, JsonNode> popularTracks = branches[0];
+        KStream<String, JsonNode> lessPopularTracks = branches[1];
 
-        KafkaStreams streams = new KafkaStreams(builder.build(), config);
-        streams.cleanUp();
-        streams.start();
+        popularTracks.peek((k, track) -> log.info("Popular Track Name: " + track.get("name")))
+                .to("popular-tracks", Produced.with(Serdes.String(), jsonSerde));
+        lessPopularTracks.peek((k, track) -> log.info("Less Popular Track Name " + track.get("name")))
+                .to("less-popular-tracks",  Produced.with(Serdes.String(), jsonSerde));
 
-        // print the topology
-        streams.localThreadsMetadata().forEach(data -> System.out.println(data));
-
-        // shutdown hook to correctly close the streams application
-        Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
+        return new KafkaStreams(builder.build(), config);
     }
 
     private static boolean isPopular(JsonNode playlistTracks) {
