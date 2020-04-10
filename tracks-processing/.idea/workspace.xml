@@ -2,13 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="20b59fd2-3630-49e1-8f22-0f79e14b4839" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/AppConfig.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/application.conf" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../track_producer/tracks_producer.go" beforeDir="false" afterPath="$PROJECT_DIR$/../track_producer/tracks_producer.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/PopularityFilterApp.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/PopularityFilterApp.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/PopularityFilterApp.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/PopularityFilterApp.class" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -83,7 +78,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1586375355245</updated>
-      <workItem from="1586375358530" duration="14259000" />
+      <workItem from="1586375358530" duration="16276000" />
     </task>
     <servers />
   </component>
