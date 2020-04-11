@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/Shopify/sarama"
-	"github.com/spotify-playlist-generator/track_producer/auth"
+	"github.com/spotify-playlist-generator/tracks-producer/auth"
 	"github.com/zmb3/spotify"
 )
 
@@ -15,13 +15,8 @@ type App struct {
 	client *spotify.Client
 }
 
-const redirectURI = "http://localhost:8080/callback"
-
 var (
-	app = &App{}
-	// auth   = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate)
-	ch     = make(chan *spotify.Client)
-	state  = "abc123"
+	app    = &App{}
 	tracks = make(chan spotify.FullTrack)
 )
 
@@ -60,7 +55,7 @@ func main() {
 
 		_, _, err = producer.SendMessage(&sarama.ProducerMessage{
 			Topic: "playlist-tracks",
-			Key:   sarama.StringEncoder(track.SimpleTrack.ID),
+			Key:   sarama.StringEncoder(track.SimpleTrack.URI),
 			Value: sarama.StringEncoder(string(encodedTrack)),
 		})
 
@@ -114,7 +109,7 @@ func KafkaProducerSetup() (sarama.SyncProducer, error) {
 
 func loadConfig() (map[string]interface{}, error) {
 	var config map[string]interface{}
-	file, err := os.Open("track_producer/config.json")
+	file, err := os.Open("tracks-producer/config.json")
 
 	if err != nil {
 		return nil, fmt.Errorf("Error opening config file: %s", err.Error())

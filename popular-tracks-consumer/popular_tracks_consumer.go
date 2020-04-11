@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -35,7 +36,10 @@ func main() {
 		fmt.Println(err.Error())
 	}
 
-	messages := make(chan string)
+	var wg sync.WaitGroup
+	var results []string
+	trackURIs := make(chan string)
+
 	initialOffset := sarama.OffsetOldest //offset to start reading message from
 	timer := time.NewTimer(3 * time.Second)
 	for _, partition := range partitionList {
@@ -45,27 +49,40 @@ func main() {
 			log.Fatal(err.Error())
 		}
 
-		go func(pc sarama.PartitionConsumer) {
+		wg.Add(1)
+		go func(pc sarama.PartitionConsumer, partitionNum int32) {
 		ConsumerLoop:
 			for {
 				select {
 				case msg := <-pc.Messages():
 					fmt.Println("New message babyyyyy")
-					fmt.Println(string(msg.Value))
+					trackURIs <- string(msg.Value)
+					// fmt.Println(string(msg.Value))
 					if !timer.Stop() {
 						<-timer.C
 					}
 					timer.Reset(3 * time.Second)
 				case <-timer.C:
-					log.Println("Timeout!")
+					log.Println("Timeout")
 					break ConsumerLoop
 				}
 			}
-			messages <- "Donezooo"
-		}(pc)
+			log.Printf("Partition #%d status = donezoo", partitionNum)
+			wg.Done()
+		}(pc, partition)
 	}
 
-	<-messages
+	// collects results
+	go func() {
+		for trackURI := range trackURIs {
+			results = append(results, trackURI)
+		}
+	}()
+
+	wg.Wait()
+	close(tracks)
+	fmt.Println(len(results))
+
 	// authenticates user and stores tokens
 	// client, err := auth.Authenticate()
 
