@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/zmb3/spotify"
@@ -20,10 +21,9 @@ var (
 )
 
 func main() {
-	// load config containing playlist IDs
-	// config, err := loadConfig()
-	//addresses of available kafka brokers
+	sarama.Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
 	brokers := []string{"127.0.0.1:9092"}
+
 	consumer, err := sarama.NewConsumer(brokers, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -35,19 +35,33 @@ func main() {
 		fmt.Println(err.Error())
 	}
 
-	messages := make(chan *sarama.ConsumerMessage, 256)
+	messages := make(chan string)
 	initialOffset := sarama.OffsetOldest //offset to start reading message from
+	timer := time.NewTimer(3 * time.Second)
 	for _, partition := range partitionList {
 		pc, err := consumer.ConsumePartition(topic, partition, initialOffset)
+
 		if err != nil {
 			log.Fatal(err.Error())
 		}
+
 		go func(pc sarama.PartitionConsumer) {
-			for message := range pc.Messages() {
-				fmt.Println("New message babyyyyy")
-				fmt.Println("Message Key: " + string(message.Key))
-				fmt.Println("Mesage Value: " + string(message.Value))
+		ConsumerLoop:
+			for {
+				select {
+				case msg := <-pc.Messages():
+					fmt.Println("New message babyyyyy")
+					fmt.Println(string(msg.Value))
+					if !timer.Stop() {
+						<-timer.C
+					}
+					timer.Reset(3 * time.Second)
+				case <-timer.C:
+					log.Println("Timeout!")
+					break ConsumerLoop
+				}
 			}
+			messages <- "Donezooo"
 		}(pc)
 	}
 
