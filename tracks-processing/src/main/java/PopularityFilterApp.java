@@ -14,9 +14,12 @@ import org.apache.kafka.streams.kstream.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 public class PopularityFilterApp {
+    private static List<String> trackIDs = new ArrayList<String>();
     private static Logger log = LoggerFactory.getLogger(PopularityFilterApp.class.getName());
     private AppConfig appConfig;
 
@@ -67,10 +70,14 @@ public class PopularityFilterApp {
         KStream<String, JsonNode> popularTracks = branches[0];
         KStream<String, JsonNode> lessPopularTracks = branches[1];
 
-        popularTracks.peek((k, track) -> log.info("Popular Track Name: " + track.get("name")))
-                .to("popular-tracks", Produced.with(Serdes.String(), jsonSerde));
-        lessPopularTracks.peek((k, track) -> log.info("Less Popular Track Name " + track.get("name")))
-                .to("less-popular-tracks",  Produced.with(Serdes.String(), jsonSerde));
+        popularTracks
+                .peek((trackID, trackData) -> log.info("Popular Track Name: " + trackData.get("name")))
+                .filter((trackID, trackData) -> isDuplicate(trackID))
+                .to(appConfig.getPopularTrackTopicName(), Produced.with(Serdes.String(), jsonSerde));
+        lessPopularTracks
+                .peek((k, trackData) -> log.info("Less Popular Track Name " + trackData.get("name")))
+                .filter((trackID, trackData) -> isDuplicate(trackID))
+                .to(appConfig.getLessPopularTrackTopicName(),  Produced.with(Serdes.String(), jsonSerde));
 
         return new KafkaStreams(builder.build(), config);
     }
@@ -78,5 +85,14 @@ public class PopularityFilterApp {
     private static boolean isPopular(JsonNode playlistTracks) {
         int popularity = playlistTracks.get("popularity").asInt();
         return popularity > 80;
+    }
+
+    private static boolean isDuplicate(String trackID) {
+        if (trackIDs.contains(trackID)) {
+            return true;
+        }
+
+        trackIDs.add(trackID);
+        return false;
     }
 }

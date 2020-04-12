@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/spotify-playlist-generator/tracks-producer/auth"
 	"github.com/zmb3/spotify"
 )
 
@@ -37,8 +38,9 @@ func main() {
 	}
 
 	var wg sync.WaitGroup
-	var results []string
-	trackURIs := make(chan string)
+	var results []spotify.ID
+	trackIDs := make(map[spotify.ID]bool)
+	trackURIs := make(chan spotify.ID)
 
 	initialOffset := sarama.OffsetOldest //offset to start reading message from
 	timer := time.NewTimer(3 * time.Second)
@@ -55,8 +57,9 @@ func main() {
 			for {
 				select {
 				case msg := <-pc.Messages():
-					fmt.Println("New message babyyyyy")
-					trackURIs <- string(msg.Value)
+					var track spotify.FullTrack
+					json.Unmarshal(msg.Value, &track)
+					trackURIs <- track.ID
 					// fmt.Println(string(msg.Value))
 					if !timer.Stop() {
 						<-timer.C
@@ -75,22 +78,40 @@ func main() {
 	// collects results
 	go func() {
 		for trackURI := range trackURIs {
-			results = append(results, trackURI)
+			if _, exists := trackIDs[trackURI]; !exists {
+				results = append(results, trackURI)
+				trackIDs[trackURI] = true
+			}
 		}
 	}()
 
 	wg.Wait()
 	close(tracks)
-	fmt.Println(len(results))
 
 	// authenticates user and stores tokens
-	// client, err := auth.Authenticate()
+	client, err := auth.Authenticate()
 
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// app.client = client
+	app.client = client
+
+	user, err := client.CurrentUser()
+	if err != nil {
+		log.Fatalln("Error getting user " + err.Error())
+	}
+
+	playlist, err := app.client.CreatePlaylistForUser(user.ID, "Automatic Bangers", "All these bangers are brought to you by Kafka", true)
+	if err != nil {
+		log.Fatalln("Error creating playlist: " + err.Error())
+	}
+
+	_, err = app.client.AddTracksToPlaylist(playlist.ID, results...)
+	if err != nil {
+		log.Fatalln("shit")
+	}
+
 }
 
 func loadConfig() (map[string]interface{}, error) {

@@ -28,7 +28,7 @@ public class AppConfig {
         return popularTopicName;
     }
 
-    public String getFraudTopicName() {
+    public String getLessPopularTrackTopicName() {
         return lessPopularTopicName;
     }
 

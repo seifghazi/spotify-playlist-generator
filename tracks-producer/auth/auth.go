@@ -11,16 +11,13 @@ import (
 const redirectURI = "http://localhost:8080/callback"
 
 var (
-	auth  = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate)
+	auth  = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopePlaylistModifyPublic)
 	ch    = make(chan *spotify.Client)
 	state = "abc123"
 )
 
 func Authenticate() (*spotify.Client, error) {
 	http.HandleFunc("/callback", completeAuth)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Got request for:", r.URL.String())
-	})
 	go http.ListenAndServe(":8080", nil)
 
 	url := auth.AuthURL(state)
