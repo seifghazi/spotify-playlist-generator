@@ -4,13 +4,6 @@
     <list default="true" id="20b59fd2-3630-49e1-8f22-0f79e14b4839" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/../popular-tracks-consumer/popular_tracks_consumer.go" beforeDir="false" afterPath="$PROJECT_DIR$/../popular-tracks-consumer/popular_tracks_consumer.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/AppConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/AppConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/PopularityFilterApp.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/PopularityFilterApp.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/AppConfig.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/AppConfig.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/PopularityFilterApp.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/PopularityFilterApp.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tracks-producer/auth/auth.go" beforeDir="false" afterPath="$PROJECT_DIR$/../tracks-producer/auth/auth.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tracks-producer/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/../tracks-producer/config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tracks-producer/tracks_producer.go" beforeDir="false" afterPath="$PROJECT_DIR$/../tracks-producer/tracks_producer.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -86,7 +79,7 @@
       <option name="presentableId" value="Default" />
       <updated>1586375355245</updated>
       <workItem from="1586375358530" duration="16276000" />
-      <workItem from="1586563220489" duration="5527000" />
+      <workItem from="1586563220489" duration="6210000" />
     </task>
     <servers />
   </component>
@@ -102,22 +95,22 @@
       <screen x="0" y="23" width="1680" height="950" />
     </state>
     <state x="371" y="23" key="FileDocumentManager.FileCacheConflict/0.23.1680.950@0.23.1680.950" timestamp="1586460831077" />
-    <state width="1638" height="531" key="GridCell.Tab.0.bottom" timestamp="1586651353523">
+    <state width="1638" height="596" key="GridCell.Tab.0.bottom" timestamp="1586657406212">
       <screen x="0" y="23" width="1680" height="950" />
     </state>
-    <state width="1638" height="531" key="GridCell.Tab.0.bottom/0.23.1680.950@0.23.1680.950" timestamp="1586651353523" />
-    <state width="1638" height="531" key="GridCell.Tab.0.center" timestamp="1586651353522">
+    <state width="1638" height="596" key="GridCell.Tab.0.bottom/0.23.1680.950@0.23.1680.950" timestamp="1586657406212" />
+    <state width="1638" height="596" key="GridCell.Tab.0.center" timestamp="1586657406211">
       <screen x="0" y="23" width="1680" height="950" />
     </state>
-    <state width="1638" height="531" key="GridCell.Tab.0.center/0.23.1680.950@0.23.1680.950" timestamp="1586651353522" />
-    <state width="1638" height="531" key="GridCell.Tab.0.left" timestamp="1586651353522">
+    <state width="1638" height="596" key="GridCell.Tab.0.center/0.23.1680.950@0.23.1680.950" timestamp="1586657406211" />
+    <state width="1638" height="596" key="GridCell.Tab.0.left" timestamp="1586657406211">
       <screen x="0" y="23" width="1680" height="950" />
     </state>
-    <state width="1638" height="531" key="GridCell.Tab.0.left/0.23.1680.950@0.23.1680.950" timestamp="1586651353522" />
-    <state width="1638" height="531" key="GridCell.Tab.0.right" timestamp="1586651353523">
+    <state width="1638" height="596" key="GridCell.Tab.0.left/0.23.1680.950@0.23.1680.950" timestamp="1586657406211" />
+    <state width="1638" height="596" key="GridCell.Tab.0.right" timestamp="1586657406211">
       <screen x="0" y="23" width="1680" height="950" />
     </state>
-    <state width="1638" height="531" key="GridCell.Tab.0.right/0.23.1680.950@0.23.1680.950" timestamp="1586651353523" />
+    <state width="1638" height="596" key="GridCell.Tab.0.right/0.23.1680.950@0.23.1680.950" timestamp="1586657406211" />
     <state x="500" y="330" key="com.intellij.ide.util.TipDialog" timestamp="1586563221597">
       <screen x="0" y="23" width="1680" height="950" />
     </state>
