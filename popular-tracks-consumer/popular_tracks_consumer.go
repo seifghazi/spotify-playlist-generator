@@ -33,15 +33,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	popularTracksChannel := make(chan spotify.ID)
-	listOfPopularTrackIDs := getTrackIDs(consumer, "popular-tracks", popularTracksChannel, popularTrackIDs)
-
+	popularTracksChannel := make(chan []spotify.ID)
+	getTrackIDs(consumer, "popular-tracks", popularTracksChannel, popularTrackIDs)
+	listOfPopularTrackIDs := <-popularTracksChannel
 	fmt.Println("Before wait")
 	fmt.Println(listOfPopularTrackIDs)
+	wg.Wait()
 
 	// lessPopularTracksChannel := make(chan spotify.ID)
 	// listofLessPopularTrackIDs := getTrackIDs(consumer, "less-popular-tracks", lessPopularTracksChannel, lessPopularTrackIDs)
-	wg.Wait()
+
 	fmt.Println("After wait")
 	fmt.Println(listOfPopularTrackIDs)
 	// close(popularTracksChannel)
@@ -91,25 +92,21 @@ func kafkaConsumerSetup() (sarama.Consumer, error) {
 	return consumer, nil
 }
 
-func getTrackIDs(consumer sarama.Consumer, topic string, trackIDChannel chan spotify.ID, consumedIDs map[spotify.ID]bool) []spotify.ID {
+func getTrackIDs(consumer sarama.Consumer, topic string, trackIDChannel chan []spotify.ID, consumedIDs map[spotify.ID]bool) []spotify.ID {
 	// collects results
 	var results []spotify.ID
-	go func() {
-		for trackID := range trackIDChannel {
-			if _, exists := consumedIDs[trackID]; !exists {
-				fmt.Println(trackID)
-				results = append(results, trackID)
-				consumedIDs[trackID] = true
-			}
-		}
-	}()
+	// go func() {
+	// 	for trackIDs := range trackIDChannel {
+	// 		results = trackIDs
+	// 	}
+	// }()
 
-	consumeTracks(consumer, topic, trackIDChannel)
+	consumeTracks(consumer, topic, trackIDChannel, consumedIDs)
 
 	return results
 }
 
-func consumeTracks(consumer sarama.Consumer, topic string, trackIDChannel chan spotify.ID) {
+func consumeTracks(consumer sarama.Consumer, topic string, trackIDChannel chan []spotify.ID, consumedIDs map[spotify.ID]bool) {
 	partitionList, _ := consumer.Partitions(topic)
 	initialOffset := sarama.OffsetOldest
 	timer := time.NewTimer(3 * time.Second)
@@ -123,13 +120,17 @@ func consumeTracks(consumer sarama.Consumer, topic string, trackIDChannel chan s
 
 		wg.Add(1)
 		go func(pc sarama.PartitionConsumer, partitionNum int32) {
+			var results []spotify.ID
 		ConsumerLoop:
 			for {
 				select {
 				case msg := <-pc.Messages():
 					var track spotify.FullTrack
 					json.Unmarshal(msg.Value, &track)
-					trackIDChannel <- track.ID
+					if _, exists := consumedIDs[track.ID]; !exists {
+						results = append(results, track.ID)
+						consumedIDs[track.ID] = true
+					}
 					// fmt.Println(string(msg.Value))
 					if !timer.Stop() {
 						<-timer.C
@@ -137,6 +138,7 @@ func consumeTracks(consumer sarama.Consumer, topic string, trackIDChannel chan s
 					timer.Reset(3 * time.Second)
 				case <-timer.C:
 					log.Println("Timeout")
+					trackIDChannel <- results
 					break ConsumerLoop
 				}
 			}
