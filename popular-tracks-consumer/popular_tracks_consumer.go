@@ -21,8 +21,7 @@ var (
 	app                 = &App{}
 	popularTrackIDs     = make(map[spotify.ID]bool)
 	lessPopularTrackIDs = make(map[spotify.ID]bool)
-	// trackURIs = make(chan spotify.ID)
-	wg sync.WaitGroup
+	wg                  sync.WaitGroup
 )
 
 func main() {
@@ -33,52 +32,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	popularTracksChannel := make(chan []spotify.ID)
-	getTrackIDs(consumer, "popular-tracks", popularTracksChannel, popularTrackIDs)
-	listOfPopularTrackIDs := <-popularTracksChannel
-	fmt.Println("Before wait")
-	fmt.Println(listOfPopularTrackIDs)
-	wg.Wait()
+	app.client = getSpotifyClient()
 
-	// lessPopularTracksChannel := make(chan spotify.ID)
-	// listofLessPopularTrackIDs := getTrackIDs(consumer, "less-popular-tracks", lessPopularTracksChannel, lessPopularTrackIDs)
+	listOfLessPopularTrackIDs, listOfPopularTrackIDs, err := getTrackListFromTopics(consumer)
 
-	fmt.Println("After wait")
-	fmt.Println(listOfPopularTrackIDs)
-	// close(popularTracksChannel)
-	// close(lessPopularTracksChannel)
-
-	// authenticates user and stores tokens
-	client, err := auth.Authenticate()
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	app.client = client
-
-	err = app.AddTracksToPlaylist("Bangers", "All this heat is brought to you by Kafka", listOfPopularTrackIDs...)
+	err = app.addTracksToPlaylist("Bangers", "All this heat is brought to you by Kafka", listOfPopularTrackIDs...)
 	if err != nil {
 		log.Fatalln("Error adding tracks to playlist: " + err.Error())
 	}
 
-	// err = app.AddTracksToPlaylist("Potential Bangers", "All this heat is brought to you by Kafka", listofLessPopularTrackIDs...)
+	err = app.addTracksToPlaylist("Potential Bangers", "All this heat is brought to you by Kafka", listOfLessPopularTrackIDs...)
 	if err != nil {
 		log.Fatalln("Error adding tracks to playlist: " + err.Error())
 	}
-
-	// user, err := client.CurrentUser()
-
-	// playlist, err := app.client.CreatePlaylistForUser(user.ID, "Automatic Bangers", "All these bangers are brought to you by Kafka", true)
-	// if err != nil {
-	// 	log.Fatalln("Error creating playlist: " + err.Error())
-	// }
-
-	// _, err = app.client.AddTracksToPlaylist(playlist.ID, listOfPopularTrackIDs...)
-	// if err != nil {
-	// 	log.Fatalln("shit")
-	// }
-
 }
 
 func kafkaConsumerSetup() (sarama.Consumer, error) {
@@ -92,25 +58,43 @@ func kafkaConsumerSetup() (sarama.Consumer, error) {
 	return consumer, nil
 }
 
-func getTrackIDs(consumer sarama.Consumer, topic string, trackIDChannel chan []spotify.ID, consumedIDs map[spotify.ID]bool) []spotify.ID {
-	// collects results
-	var results []spotify.ID
-	// go func() {
-	// 	for trackIDs := range trackIDChannel {
-	// 		results = trackIDs
-	// 	}
-	// }()
+func getTrackListFromTopics(consumer sarama.Consumer) ([]spotify.ID, []spotify.ID, error) {
+	wg.Add(2)
 
-	consumeTracks(consumer, topic, trackIDChannel, consumedIDs)
+	popularTracksChannel := make(chan []spotify.ID, 1)
+	lessPopularTracksChannel := make(chan []spotify.ID, 1)
+	defer close(popularTracksChannel)
+	defer close(lessPopularTracksChannel)
 
-	return results
+	go consumeTracks(consumer, "popular-tracks", popularTracksChannel, popularTrackIDs)
+	go consumeTracks(consumer, "less-popular-tracks", lessPopularTracksChannel, lessPopularTrackIDs)
+
+	wg.Wait()
+
+	listOfLessPopularTrackIDs := <-lessPopularTracksChannel
+	listOfPopularTrackIDs := <-popularTracksChannel
+
+	return listOfLessPopularTrackIDs, listOfPopularTrackIDs, nil
+}
+
+func getSpotifyClient() *spotify.Client {
+	// authenticates user and stores tokens
+	client, err := auth.Authenticate()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return client
 }
 
 func consumeTracks(consumer sarama.Consumer, topic string, trackIDChannel chan []spotify.ID, consumedIDs map[spotify.ID]bool) {
+	const maxNumSongs = 100
 	partitionList, _ := consumer.Partitions(topic)
 	initialOffset := sarama.OffsetOldest
 	timer := time.NewTimer(3 * time.Second)
 
+	defer wg.Done()
 	for _, partition := range partitionList {
 		pc, err := consumer.ConsumePartition(topic, partition, initialOffset)
 
@@ -118,7 +102,6 @@ func consumeTracks(consumer sarama.Consumer, topic string, trackIDChannel chan [
 			log.Fatal(err.Error())
 		}
 
-		wg.Add(1)
 		go func(pc sarama.PartitionConsumer, partitionNum int32) {
 			var results []spotify.ID
 		ConsumerLoop:
@@ -127,28 +110,28 @@ func consumeTracks(consumer sarama.Consumer, topic string, trackIDChannel chan [
 				case msg := <-pc.Messages():
 					var track spotify.FullTrack
 					json.Unmarshal(msg.Value, &track)
-					if _, exists := consumedIDs[track.ID]; !exists {
+					if _, exists := consumedIDs[track.ID]; !exists && len(results) < maxNumSongs {
 						results = append(results, track.ID)
 						consumedIDs[track.ID] = true
 					}
-					// fmt.Println(string(msg.Value))
+
 					if !timer.Stop() {
 						<-timer.C
 					}
 					timer.Reset(3 * time.Second)
 				case <-timer.C:
-					log.Println("Timeout")
 					trackIDChannel <- results
+					fmt.Println("we here")
 					break ConsumerLoop
 				}
 			}
-			log.Printf("Partition #%d status = donezoo", partitionNum)
-			wg.Done()
+			log.Printf("Partition #%d for topic %s status = donezoo", partitionNum, topic)
+
 		}(pc, partition)
 	}
 }
 
-func (a *App) AddTracksToPlaylist(name, description string, trackIDs ...spotify.ID) error {
+func (a *App) addTracksToPlaylist(name, description string, trackIDs ...spotify.ID) error {
 	user, err := a.client.CurrentUser()
 	if err != nil {
 		return err
