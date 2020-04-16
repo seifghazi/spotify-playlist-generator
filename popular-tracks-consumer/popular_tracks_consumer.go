@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/spotify-playlist-generator/popular-tracks-consumer/config"
 	"github.com/spotify-playlist-generator/tracks-producer/auth"
 	"github.com/zmb3/spotify"
 )
 
 type App struct {
 	client *spotify.Client
+	config config.Config
 }
 
 var (
@@ -26,13 +28,15 @@ var (
 
 func main() {
 	sarama.Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
+	config, _ := loadConfig()
+	app.config = config
+	app.client = getSpotifyClient()
 
 	consumer, err := kafkaConsumerSetup()
+
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	app.client = getSpotifyClient()
 
 	listOfLessPopularTrackIDs, listOfPopularTrackIDs, err := getTrackListFromTopics(consumer)
 
@@ -40,7 +44,6 @@ func main() {
 	if err != nil {
 		log.Fatalln("Error adding tracks to playlist: " + err.Error())
 	}
-
 	err = app.addTracksToPlaylist("Potential Bangers", "All this heat is brought to you by Kafka", listOfLessPopularTrackIDs...)
 	if err != nil {
 		log.Fatalln("Error adding tracks to playlist: " + err.Error())
@@ -48,7 +51,8 @@ func main() {
 }
 
 func kafkaConsumerSetup() (sarama.Consumer, error) {
-	brokers := []string{"127.0.0.1:9092"}
+	brokers := app.config.KafkaConfig.BootstrapServer
+	fmt.Println("brokers", brokers)
 	consumer, err := sarama.NewConsumer(brokers, nil)
 
 	if err != nil {
@@ -63,11 +67,12 @@ func getTrackListFromTopics(consumer sarama.Consumer) ([]spotify.ID, []spotify.I
 
 	popularTracksChannel := make(chan []spotify.ID, 1)
 	lessPopularTracksChannel := make(chan []spotify.ID, 1)
+
 	defer close(popularTracksChannel)
 	defer close(lessPopularTracksChannel)
 
-	go consumeTracks(consumer, "popular-tracks", popularTracksChannel, popularTrackIDs)
-	go consumeTracks(consumer, "less-popular-tracks", lessPopularTracksChannel, lessPopularTrackIDs)
+	go consumeTracks(consumer, app.config.KafkaConfig.Topics.PopularTracks, popularTracksChannel, popularTrackIDs)
+	go consumeTracks(consumer, app.config.KafkaConfig.Topics.LessPopularTracks, lessPopularTracksChannel, lessPopularTrackIDs)
 
 	wg.Wait()
 
@@ -78,7 +83,6 @@ func getTrackListFromTopics(consumer sarama.Consumer) ([]spotify.ID, []spotify.I
 }
 
 func getSpotifyClient() *spotify.Client {
-	// authenticates user and stores tokens
 	client, err := auth.Authenticate()
 
 	if err != nil {
@@ -89,12 +93,13 @@ func getSpotifyClient() *spotify.Client {
 }
 
 func consumeTracks(consumer sarama.Consumer, topic string, trackIDChannel chan []spotify.ID, consumedIDs map[spotify.ID]bool) {
-	const maxNumSongs = 100
-	partitionList, _ := consumer.Partitions(topic)
 	initialOffset := sarama.OffsetOldest
-	timer := time.NewTimer(3 * time.Second)
-
+	maxNumSongs := app.config.MaxNumSongs
+	partitionList, _ := consumer.Partitions(topic)
+	timeout := app.config.KafkaConfig.ConsumerTimeout
+	timer := time.NewTimer(timeout * time.Second)
 	defer wg.Done()
+
 	for _, partition := range partitionList {
 		pc, err := consumer.ConsumePartition(topic, partition, initialOffset)
 
@@ -118,10 +123,9 @@ func consumeTracks(consumer sarama.Consumer, topic string, trackIDChannel chan [
 					if !timer.Stop() {
 						<-timer.C
 					}
-					timer.Reset(3 * time.Second)
+					timer.Reset(timeout * time.Second)
 				case <-timer.C:
 					trackIDChannel <- results
-					fmt.Println("we here")
 					break ConsumerLoop
 				}
 			}
@@ -150,12 +154,12 @@ func (a *App) addTracksToPlaylist(name, description string, trackIDs ...spotify.
 	return nil
 }
 
-func loadConfig() (map[string]interface{}, error) {
-	var config map[string]interface{}
-	file, err := os.Open("popular-tracks-consumer/config.json")
+func loadConfig() (config.Config, error) {
+	config := config.Config{}
+	file, err := os.Open("popular-tracks-consumer/config/config.json")
 
 	if err != nil {
-		return nil, fmt.Errorf("Error opening config file: %s", err.Error())
+		return config, fmt.Errorf("Error opening config file: %s", err.Error())
 	}
 
 	defer file.Close()
@@ -164,8 +168,10 @@ func loadConfig() (map[string]interface{}, error) {
 	err = decoder.Decode(&config)
 
 	if err != nil {
-		return nil, fmt.Errorf("Error decoding config file: %s", err.Error())
+		return config, fmt.Errorf("Error decoding config file: %s", err.Error())
 	}
+
+	fmt.Println("max num songs", config.MaxNumSongs)
 
 	return config, nil
 }

@@ -1,0 +1,14 @@
+{
+    "redirectURI": "http://localhost:8080/callback",
+    "kafka": {
+        "bootstrapServers": [
+            "127.0.0.1:9092"
+        ],
+        "topics": {
+            "popularTracks": "popular-tracks",
+            "lessPopularTracks": "less-popular-tracks"
+        },
+        "timeoutInSecs": 2
+    },
+    "maxNumSongs": 100
+}
