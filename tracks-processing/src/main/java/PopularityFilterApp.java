@@ -79,6 +79,13 @@ public class PopularityFilterApp {
                 .filter((trackID, trackData) -> isDuplicate(trackID))
                 .to(appConfig.getLessPopularTrackTopicName(),  Produced.with(Serdes.String(), jsonSerde));
 
+        popularTracks.to("poptrack.table", Produced.with(Serdes.String(), jsonSerde));
+
+        KTable<String, JsonNode> table = builder.table("poptrack.table", Consumed.with(Serdes.String(), jsonSerde));
+
+       KTable<String, Long> tempTable = table.toStream().groupByKey(Serialized.with(Serdes.String(), jsonSerde)).count(Materialized.as("Counts"));
+               tempTable.toStream().to("temp-topic", Produced.with(Serdes.String(), Serdes.Long()));
+
         return new KafkaStreams(builder.build(), config);
     }
 
@@ -91,7 +98,6 @@ public class PopularityFilterApp {
         if (trackIDs.contains(trackID)) {
             return true;
         }
-
         trackIDs.add(trackID);
         return false;
     }
