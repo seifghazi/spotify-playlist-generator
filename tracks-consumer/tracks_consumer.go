@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/spotify-playlist-generator/popular-tracks-consumer/config"
-	"github.com/spotify-playlist-generator/tracks-producer/auth"
+	"github.com/spotify-playlist-generator/tracks-consumer/auth"
+	"github.com/spotify-playlist-generator/tracks-consumer/config"
+
 	"github.com/zmb3/spotify"
 )
 
@@ -156,7 +157,7 @@ func (a *App) addTracksToPlaylist(name, description string, trackIDs ...spotify.
 
 func loadConfig() (config.Config, error) {
 	config := config.Config{}
-	file, err := os.Open("popular-tracks-consumer/config/config.json")
+	file, err := os.Open("tracks-consumer/config/config.json")
 
 	if err != nil {
 		return config, fmt.Errorf("Error opening config file: %s", err.Error())
