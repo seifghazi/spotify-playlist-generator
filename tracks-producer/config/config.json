@@ -1,10 +1,18 @@
 {
-    "redirect_uri": "http://localhost:8080/callback",
+    "kafka": {
+        "bootstrapServers": [
+            "127.0.0.1:9092"
+        ],
+        "topics": {
+            "tracks": "playlist-tracks"
+        }
+    },
     "playlists": {
         "Global Top 50": "37i9dQZEVXbMDoHDwVN2tF",
         "Chill Hits": "37i9dQZF1DX4WYpdgoIcn6",
         "Hip Hop Central": "37i9dQZF1DWY6tYEFs22tT",
         "Acoustic Hits": "37i9dQZF1DX4VvfRBFClxm",
         "New Releases Friday": "37i9dQZF1DX5DfG8gQdC3F"
-    }
+    },
+    "maxNumSongsToFetch": 50
 }

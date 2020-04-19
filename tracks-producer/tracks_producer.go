@@ -8,11 +8,13 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/spotify-playlist-generator/tracks-producer/auth"
+	"github.com/spotify-playlist-generator/tracks-producer/config"
 	"github.com/zmb3/spotify"
 )
 
 type App struct {
 	client *spotify.Client
+	config config.Config
 }
 
 var (
@@ -21,11 +23,14 @@ var (
 )
 
 func main() {
+	sarama.Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
 	// load config containing playlist IDs
 	config, err := loadConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	app.config = config
 
 	// authenticates user and stores tokens
 	client, err := auth.Authenticate()
@@ -36,15 +41,15 @@ func main() {
 
 	app.client = client
 
-	producer, err := KafkaProducerSetup()
+	producer, err := app.KafkaProducerSetup()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// get playlist tracks and produce to kafka
-	playlists := config["playlists"].(map[string]interface{})
+	playlists := config.Playlists
 	for playlistName, playlistID := range playlists {
-		go app.GetPlaylistTracks(playlistName, playlistID.(string), tracks)
+		go app.GetPlaylistTracks(playlistName, playlistID, tracks)
 	}
 
 	for track := range tracks {
@@ -53,7 +58,7 @@ func main() {
 			log.Fatalf("Error marshalling track: %s", err.Error())
 		}
 		_, _, err = producer.SendMessage(&sarama.ProducerMessage{
-			Topic: "playlist-tracks",
+			Topic: app.config.KafkaConfig.Topics.PlaylistTracks,
 			Key:   sarama.StringEncoder(track.ID),
 			Value: sarama.StringEncoder(string(encodedTrack)),
 		})
@@ -69,7 +74,7 @@ func main() {
 func (a *App) GetPlaylistTracks(playlistName, playlistID string, tracks chan spotify.FullTrack) {
 	fmt.Println("Fetching tracks for playlist: " + playlistName)
 	// send request
-	limit := 1
+	limit := a.config.Limit
 	options := &spotify.Options{Limit: &limit}
 	fields := "items(name, track(name,album(name, id),artists,id, popularity))"
 
@@ -86,7 +91,7 @@ func (a *App) GetPlaylistTracks(playlistName, playlistID string, tracks chan spo
 	}
 }
 
-func KafkaProducerSetup() (sarama.SyncProducer, error) {
+func (a *App) KafkaProducerSetup() (sarama.SyncProducer, error) {
 	//setup relevant config info
 	config := sarama.NewConfig()
 	config.Producer.Partitioner = sarama.NewRandomPartitioner
@@ -95,7 +100,7 @@ func KafkaProducerSetup() (sarama.SyncProducer, error) {
 	config.Version = sarama.MaxVersion
 	config.Net.MaxOpenRequests = 1
 	config.Producer.Idempotent = true
-	bootstrapServers := []string{"localhost:9092"}
+	bootstrapServers := a.config.KafkaConfig.BootstrapServer
 
 	producer, err := sarama.NewSyncProducer(bootstrapServers, config)
 
@@ -106,12 +111,12 @@ func KafkaProducerSetup() (sarama.SyncProducer, error) {
 	return producer, nil
 }
 
-func loadConfig() (map[string]interface{}, error) {
-	var config map[string]interface{}
-	file, err := os.Open("tracks-producer/config.json")
+func loadConfig() (config.Config, error) {
+	config := config.Config{}
+	file, err := os.Open("tracks-producer/config/config.json")
 
 	if err != nil {
-		return nil, fmt.Errorf("Error opening config file: %s", err.Error())
+		return config, fmt.Errorf("Error opening config file: %s", err.Error())
 	}
 
 	defer file.Close()
@@ -120,7 +125,7 @@ func loadConfig() (map[string]interface{}, error) {
 	err = decoder.Decode(&config)
 
 	if err != nil {
-		return nil, fmt.Errorf("Error decoding config file: %s", err.Error())
+		return config, fmt.Errorf("Error decoding config file: %s", err.Error())
 	}
 
 	return config, nil

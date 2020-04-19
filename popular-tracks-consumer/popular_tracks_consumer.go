@@ -171,7 +171,5 @@ func loadConfig() (config.Config, error) {
 		return config, fmt.Errorf("Error decoding config file: %s", err.Error())
 	}
 
-	fmt.Println("max num songs", config.MaxNumSongs)
-
 	return config, nil
 }

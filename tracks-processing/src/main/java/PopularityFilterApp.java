@@ -1,5 +1,4 @@
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.typesafe.config.ConfigFactory;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Deserializer;
@@ -18,8 +17,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-
-import static com.oracle.jrockit.jfr.ContentType.Bytes;
 
 public class PopularityFilterApp {
     private static List<String> trackIDs = new ArrayList<String>();
