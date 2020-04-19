@@ -14,3 +14,14 @@ Generate personalized playlists containing the most popular songs from across yo
  - Trending-Artists Topic: List of artists who appeared in more than twice across playlists
 
 3. A Kafka Consumer consumes from the popular and less-popular topics and makes a REST call to Spotify and creates 2 new playlists containing these new tracks. 
+
+
+## Usage
+
+Prereqs: Zookeeper and Kafka Server running locally
+
+Clone and run the following commands from the root of the repo: 
+
+- Track Producing: `go run tracks-producer/tracks_producer.go`
+- Track Consuming: `go run tracks-consumer/tracks_consumer.go`
+- Track Processing: `TODO: Add tracks-processing jar file` (For now you can run it in an IDE)
