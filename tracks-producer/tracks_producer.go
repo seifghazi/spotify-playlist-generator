@@ -52,10 +52,9 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error marshalling track: %s", err.Error())
 		}
-
 		_, _, err = producer.SendMessage(&sarama.ProducerMessage{
 			Topic: "playlist-tracks",
-			Key:   sarama.StringEncoder(track.SimpleTrack.URI),
+			Key:   sarama.StringEncoder(track.ID),
 			Value: sarama.StringEncoder(string(encodedTrack)),
 		})
 

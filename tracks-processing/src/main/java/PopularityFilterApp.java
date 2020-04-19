@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
+import static com.oracle.jrockit.jfr.ContentType.Bytes;
+
 public class PopularityFilterApp {
     private static List<String> trackIDs = new ArrayList<String>();
     private static Logger log = LoggerFactory.getLogger(PopularityFilterApp.class.getName());
@@ -47,7 +49,7 @@ public class PopularityFilterApp {
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         config.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, "0");
         config.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, StreamsConfig.EXACTLY_ONCE);
-
+        // we disable the cache to demonstrate all the "steps" involved in the transformation - not recommended in prod
         return config;
     }
 
@@ -61,30 +63,24 @@ public class PopularityFilterApp {
         KStream<String, JsonNode> playlistTracks = builder.stream(appConfig.getSourceTopicName(),
                 Consumed.with(Serdes.String(), jsonSerde));
 
-
-        KStream<String, JsonNode>[] branches = playlistTracks.branch(
-                (trackID, trackData) -> isPopular(trackData),
-                (trackID, trackData) -> true
-        );
+        KStream<String, JsonNode>[] branches = playlistTracks.branch((trackID, trackData) -> isPopular(trackData),
+                (trackID, trackData) -> true);
 
         KStream<String, JsonNode> popularTracks = branches[0];
         KStream<String, JsonNode> lessPopularTracks = branches[1];
 
-        popularTracks
-                .peek((trackID, trackData) -> log.info("Popular Track Name: " + trackData.get("name")))
-                .filter((trackID, trackData) -> isDuplicate(trackID))
+        popularTracks.peek((trackID, trackData) -> log.info("Popular Track Name: " + trackData.get("name")))
+                 .filter((trackID, trackData) -> isDuplicate(trackID))
                 .to(appConfig.getPopularTrackTopicName(), Produced.with(Serdes.String(), jsonSerde));
-        lessPopularTracks
-                .peek((k, trackData) -> log.info("Less Popular Track Name " + trackData.get("name")))
+        lessPopularTracks.peek((k, trackData) -> log.info("Less Popular Track Name " + trackData.get("name")))
                 .filter((trackID, trackData) -> isDuplicate(trackID))
-                .to(appConfig.getLessPopularTrackTopicName(),  Produced.with(Serdes.String(), jsonSerde));
+                .to(appConfig.getLessPopularTrackTopicName(), Produced.with(Serdes.String(), jsonSerde));
 
-        popularTracks.to("poptrack.table", Produced.with(Serdes.String(), jsonSerde));
+        KTable<String, Long> tempTable = popularTracks
+                .groupByKey(Serialized.with(Serdes.String(), jsonSerde))
+                .count();
 
-        KTable<String, JsonNode> table = builder.table("poptrack.table", Consumed.with(Serdes.String(), jsonSerde));
-
-       KTable<String, Long> tempTable = table.toStream().groupByKey(Serialized.with(Serdes.String(), jsonSerde)).count(Materialized.as("Counts"));
-               tempTable.toStream().to("temp-topic", Produced.with(Serdes.String(), Serdes.Long()));
+        tempTable.toStream().to("temp-topic", Produced.with(Serdes.String(), Serdes.Long()));
 
         return new KafkaStreams(builder.build(), config);
     }
