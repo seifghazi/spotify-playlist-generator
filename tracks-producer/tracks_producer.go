@@ -69,7 +69,7 @@ func main() {
 func (a *App) GetPlaylistTracks(playlistName, playlistID string, tracks chan spotify.FullTrack) {
 	fmt.Println("Fetching tracks for playlist: " + playlistName)
 	// send request
-	limit := 50
+	limit := 1
 	options := &spotify.Options{Limit: &limit}
 	fields := "items(name, track(name,album(name, id),artists,id, popularity))"
 

@@ -1,4 +1,5 @@
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.typesafe.config.ConfigFactory;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Deserializer;
@@ -49,7 +50,6 @@ public class PopularityFilterApp {
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         config.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, "0");
         config.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, StreamsConfig.EXACTLY_ONCE);
-        // we disable the cache to demonstrate all the "steps" involved in the transformation - not recommended in prod
         return config;
     }
 
@@ -63,8 +63,10 @@ public class PopularityFilterApp {
         KStream<String, JsonNode> playlistTracks = builder.stream(appConfig.getSourceTopicName(),
                 Consumed.with(Serdes.String(), jsonSerde));
 
-        KStream<String, JsonNode>[] branches = playlistTracks.branch((trackID, trackData) -> isPopular(trackData),
-                (trackID, trackData) -> true);
+        KStream<String, JsonNode>[] branches = playlistTracks.branch(
+                (trackID, trackData) -> isPopular(trackData),
+                (trackID, trackData) -> true
+        );
 
         KStream<String, JsonNode> popularTracks = branches[0];
         KStream<String, JsonNode> lessPopularTracks = branches[1];
@@ -72,15 +74,17 @@ public class PopularityFilterApp {
         popularTracks.peek((trackID, trackData) -> log.info("Popular Track Name: " + trackData.get("name")))
                  .filter((trackID, trackData) -> isDuplicate(trackID))
                 .to(appConfig.getPopularTrackTopicName(), Produced.with(Serdes.String(), jsonSerde));
-        lessPopularTracks.peek((k, trackData) -> log.info("Less Popular Track Name " + trackData.get("name")))
+        lessPopularTracks.peek((trackID, trackData) -> log.info("Less Popular Track Name " + trackData.get("name")))
                 .filter((trackID, trackData) -> isDuplicate(trackID))
                 .to(appConfig.getLessPopularTrackTopicName(), Produced.with(Serdes.String(), jsonSerde));
 
-        KTable<String, Long> tempTable = popularTracks
+        playlistTracks.selectKey((trackID, trackData) -> extractArtists(trackData))
                 .groupByKey(Serialized.with(Serdes.String(), jsonSerde))
-                .count();
-
-        tempTable.toStream().to("temp-topic", Produced.with(Serdes.String(), Serdes.Long()));
+                .count()
+                .toStream()
+                .through("artist-count", Produced.with(Serdes.String(), Serdes.Long()))
+                .filter((artistID, count) -> count > 2)
+                .to("popular-artists", Produced.with(Serdes.String(), Serdes.Long()));
 
         return new KafkaStreams(builder.build(), config);
     }
@@ -96,5 +100,17 @@ public class PopularityFilterApp {
         }
         trackIDs.add(trackID);
         return false;
+    }
+
+    private static String extractArtists(JsonNode trackData) {
+        List<String> artists = new ArrayList<>();
+        // add all artists featured on track
+        JsonNode trackArtists = trackData.get("artists");
+        for (final JsonNode objNode : trackArtists) {
+            System.out.println(objNode.get("name"));
+            artists.add(objNode.get("name").asText());
+        }
+
+        return String.join("-", artists);
     }
 }
