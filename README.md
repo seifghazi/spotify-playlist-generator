@@ -11,7 +11,7 @@ Generate personalized playlists containing the most popular songs from across yo
 2. A KafkaStreams app processes the tracks and produces to 3 topics: 
  - Popular-Tracks Topic: All songs with a track popularity >= 80%
  - Less-Popular-Tracks Topic: All songs with a track popularity < 80%
- - Trending-Artists Topic: List of artists who appeared in more than twice across playlists
+ - Trending-Artists Topic: List of artists who appeared more than twice across playlists
 
 3. A Kafka Consumer consumes from the popular and less-popular topics and makes a REST call to Spotify and creates 2 new playlists containing these new tracks. 
 
